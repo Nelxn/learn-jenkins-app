@@ -32,7 +32,7 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
+                stage('Deploy') {
             agent {
                 docker {
                     image 'node:18-slim'
@@ -41,13 +41,21 @@ pipeline {
             }
             steps {
                 sh '''
-                    npm install -g netlify-cli
+                    echo "Installing Netlify CLI locally..."
+                    npm install --no-audit --no-fund netlify-cli
+
+                    echo "Checking Netlify CLI version..."
+                    npx netlify --version
+
+                    echo "Exporting auth variables..."
                     export NETLIFY_AUTH_TOKEN=$NETLIFY_AUTH_TOKEN
                     export NETLIFY_SITE_ID=$NETLIFY_SITE_ID
-                    netlify --version
-                    echo "Deploying to production. Site ID: $NETLIFY_SITE_ID"
-                    netlify status
-                    netlify deploy --dir=build --prod
+
+                    echo "Checking Netlify site status..."
+                    npx netlify status || true
+
+                    echo "Deploying to Netlify production..."
+                    npx netlify deploy --dir=build --prod
                 '''
             }
         }
