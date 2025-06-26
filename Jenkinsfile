@@ -1,79 +1,91 @@
 pipeline {
-	agent any
+    agent any
 
-	environment {
-		DOCKER_REGISTRY = 'docker.io'
-		DOCKER_IMAGE = 'nelxn/nodejs-app'
-		DOCKER_CREDENTIALS_ID = 'docker-hub-credentials-id'
-	}
+    environment {
+        DOCKER_REGISTRY = 'docker.io'
+        DOCKER_IMAGE = 'nelxn/nodejs-app'
+        DOCKER_CREDENTIALS_ID = 'docker-hub-credentials-id'
+    }
 
-	stages {
-		stage('Build') {
-			agent {
-				docker {
-					image 'node:18-slim'
-					reuseNode true
-				}
-			}
-			steps {
-				sh '''
-					echo "Checking environment..."
-					node --version
-					npm --version
+    stages {
+        stage('Build') {
+            agent {
+                docker {
+                    image 'node:18-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh '''
+                    echo "Checking environment..."
+                    node --version
+                    npm --version
 
-					echo "Installing dependencies..."
-					if [ -f package-lock.json ]; then
-						npm ci
-					else
-						npm install --legacy-peer-deps
-					fi
+                    echo "Installing dependencies..."
+                    npm ci
+                '''
+                sh '''
+                    echo "Building project..."
+                    npm run build
+                '''
+            }
+        }
 
-					echo "Building project..."
-					npm run build
-				'''
-			}
-		}
+        stage('Test') {
+            agent {
+                docker {
+                    image 'node:18-slim'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh '''
+                    echo "Running tests..."
+                    npm test
+                '''
+            }
+        }
 
-		stage('Test') {
-			steps {
-				sh '''
-					echo "Running tests..."
-					npm test
-				'''
-			}
-		}
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    echo "Building Docker image..."
+                    docker build -t $DOCKER_REGISTRY/$DOCKER_IMAGE:latest .
+                '''
+            }
+        }
 
-		stage('Build Docker Image') {
-			steps {
-				script {
-					dockerImage = docker.build("${DOCKER_IMAGE}:${env.BUILD_NUMBER}")
-				}
-			}
-		}
+        stage('Push Docker Image') {
+            steps {
+                withDockerRegistry([credentialsId: "$DOCKER_CREDENTIALS_ID", url: ""]) {
+                    sh '''
+                        echo "Pushing Docker image to registry..."
+                        docker push $DOCKER_REGISTRY/$DOCKER_IMAGE:latest
+                    '''
+                }
+            }
+        }
 
-		stage('Deploy') {
-			agent {
-				docker {
-					image 'node:18-slim'
-					reuseNode true
-				}
-			}
-			steps {
-				script {
-					docker.withRegistry("https://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}") {
-						dockerImage.push()
-					}
-				}
-			}
-		}
-	}
+        stage('Deploy') {
+            steps {
+                sh '''
+                    echo "Deploying application..."
+                    # Add deployment commands here, e.g., kubectl apply or docker-compose up
+                '''
+            }
+        }
+    }
 
-	post {
-		failure {
-			echo 'Pipeline failed. Please check the logs above for details.'
-		}
-		success {
-			echo 'Pipeline completed successfully.'
-		}
-	}
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Please check the logs.'
+        }
+    }
 }
