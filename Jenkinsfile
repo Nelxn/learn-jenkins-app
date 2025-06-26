@@ -57,7 +57,7 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withDockerRegistry([credentialsId: "$DOCKER_CREDENTIALS_ID", url: ""]) {
+                withDockerRegistry([credentialsId: "$DOCKER_CREDENTIALS_ID", url: "https://index.docker.io/v1/"]) {
                     sh '''
                         echo "Pushing Docker image to registry..."
                         docker push $DOCKER_REGISTRY/$DOCKER_IMAGE:latest
@@ -70,7 +70,8 @@ pipeline {
             steps {
                 sh '''
                     echo "Deploying application..."
-                    # Add deployment commands here, e.g., kubectl apply or docker-compose up
+                    docker rm -f nodejs-app || true
+                    docker run -d --name nodejs-app -p 3000:3000 $DOCKER_REGISTRY/$DOCKER_IMAGE:latest
                 '''
             }
         }
@@ -89,3 +90,7 @@ pipeline {
         }
     }
 }
+
+
+
+// This Jenkinsfile defines a pipeline for building, testing, and deploying a Node.js application using Docker.
